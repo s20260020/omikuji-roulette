@@ -1,0 +1,164 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>おみくじルーレット</title>
+<style>
+*{box-sizing:border-box}
+body{
+  margin:0; min-height:100vh; display:flex; justify-content:center; align-items:center;
+  font-family:"Yu Gothic","Meiryo",sans-serif;
+  background:linear-gradient(135deg,#fff7df,#ffe5ec);
+  color:#4b3030;
+}
+.app{width:min(94vw,650px);text-align:center;padding:25px 15px 35px}
+h1{margin:0 0 8px;font-size:clamp(30px,7vw,48px);color:#c63d4d}
+.subtitle{margin:0 0 18px;font-size:17px}
+.wheel-wrap{position:relative;width:min(84vw,520px);aspect-ratio:1;margin:auto}
+canvas{width:100%;height:100%;display:block;filter:drop-shadow(0 8px 12px rgba(80,40,40,.18))}
+.pointer{
+ position:absolute;z-index:2;top:-4px;left:50%;transform:translateX(-50%);
+ width:0;height:0;border-left:21px solid transparent;border-right:21px solid transparent;
+ border-top:0;border-bottom:42px solid #c62828;
+ filter:drop-shadow(0 3px 2px rgba(0,0,0,.2));
+}
+button{
+ margin-top:20px;border:0;border-radius:999px;padding:16px 42px;
+ font-size:21px;font-weight:bold;color:white;background:#e45757;
+ cursor:pointer;box-shadow:0 5px 0 #b83d3d;
+}
+button:active{transform:translateY(4px);box-shadow:0 1px 0 #b83d3d}
+button:disabled{opacity:.55;cursor:not-allowed}
+.result{
+ margin:25px auto 0;min-height:115px;padding:14px;border-radius:20px;
+ background:rgba(255,255,255,.85);box-shadow:0 4px 15px rgba(80,40,40,.1)
+}
+.label{font-size:15px}
+#result{margin:2px 0;font-size:clamp(42px,10vw,62px);font-weight:900;color:#c63d4d}
+#message{font-size:15px}
+.note{font-size:13px;color:#806666;margin-top:15px}
+</style>
+</head>
+<body>
+<div class="app">
+<h1>🎡 おみくじルーレット</h1>
+<p class="subtitle">ルーレットを回して、今日の運勢を占おう！</p>
+
+<div class="wheel-wrap">
+  <div class="pointer"></div>
+  <canvas id="wheel" width="600" height="600"></canvas>
+</div>
+
+<button id="spin">ルーレットを回す！</button>
+
+<div class="result">
+  <div class="label">あなたの運勢は……</div>
+  <div id="result">？？？</div>
+  <div id="message">ボタンを押してスタート！</div>
+</div>
+<div class="note">※結果はランダムです。学校で楽しく使ってね！</div>
+</div>
+
+<script>
+const canvas=document.getElementById("wheel");
+const ctx=canvas.getContext("2d");
+const button=document.getElementById("spin");
+const result=document.getElementById("result");
+const message=document.getElementById("message");
+
+const fortunes=[
+ {name:"大吉",color:"#f6c84b",text:"最高の運勢！今日はきっといいことがあるよ！"},
+ {name:"吉",color:"#f39a58",text:"いい運気です。自信を持ってチャレンジしよう！"},
+ {name:"中吉",color:"#75c7a8",text:"なかなか良い運勢。笑顔を大切に！"},
+ {name:"小吉",color:"#72a8df",text:"小さな幸せが見つかるかも。"},
+ {name:"末吉",color:"#a98bd4",text:"これから運気アップ！あせらずいこう。"},
+ {name:"凶",color:"#e58b9a",text:"今日は慎重に。でも明日はきっと大丈夫！"}
+];
+
+const slice=Math.PI*2/fortunes.length;
+let rotation=0;
+let spinning=false;
+
+function draw(){
+ const cx=300,cy=300,r=285;
+ ctx.clearRect(0,0,600,600);
+ for(let i=0;i<fortunes.length;i++){
+   const a=rotation+i*slice-Math.PI/2;
+   const b=a+slice;
+   ctx.beginPath();
+   ctx.moveTo(cx,cy);
+   ctx.arc(cx,cy,r,a,b);
+   ctx.closePath();
+   ctx.fillStyle=fortunes[i].color;
+   ctx.fill();
+   ctx.strokeStyle="#fff";
+   ctx.lineWidth=6;
+   ctx.stroke();
+
+   ctx.save();
+   ctx.translate(cx,cy);
+   ctx.rotate(a+slice/2);
+   ctx.textAlign="center";
+   ctx.textBaseline="middle";
+   ctx.fillStyle="#543737";
+   ctx.font="bold 42px sans-serif";
+   ctx.fillText(fortunes[i].name,r*.66,0);
+   ctx.restore();
+ }
+ ctx.beginPath();
+ ctx.arc(cx,cy,48,0,Math.PI*2);
+ ctx.fillStyle="#fff";
+ ctx.fill();
+ ctx.strokeStyle="#c63d4d";
+ ctx.lineWidth=7;
+ ctx.stroke();
+ ctx.font="27px sans-serif";
+ ctx.textAlign="center";
+ ctx.textBaseline="middle";
+ ctx.fillText("⛩️",cx,cy);
+}
+
+function ease(t){return 1-Math.pow(1-t,4)}
+
+function spin(){
+ if(spinning)return;
+ spinning=true;
+ button.disabled=true;
+ result.textContent="・・・";
+ message.textContent="ルーレットを回しています！";
+
+ const selected=Math.floor(Math.random()*fortunes.length);
+ const target=-selected*slice-slice/2;
+ const norm=rotation%(Math.PI*2);
+ let delta=target-norm;
+ while(delta<0)delta+=Math.PI*2;
+
+ const finalRotation=rotation+delta+(6+Math.floor(Math.random()*3))*Math.PI*2;
+ const start=rotation;
+ const duration=3600;
+ const begin=performance.now();
+
+ function animate(now){
+   const t=Math.min(1,(now-begin)/duration);
+   rotation=start+(finalRotation-start)*ease(t);
+   draw();
+   if(t<1){
+     requestAnimationFrame(animate);
+   }else{
+     rotation=finalRotation;
+     draw();
+     result.textContent=fortunes[selected].name;
+     message.textContent=fortunes[selected].text;
+     spinning=false;
+     button.disabled=false;
+   }
+ }
+ requestAnimationFrame(animate);
+}
+
+button.addEventListener("click",spin);
+draw();
+</script>
+</body>
+</html>
